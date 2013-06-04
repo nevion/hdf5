@@ -13,10 +13,11 @@
  * access to either file, you may request a copy from help@hdfgroup.org.     *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-#include <stdlib.h>
-
+#include "H5private.h"      /* Generic Functions            */
+#include "H5Eprivate.h"     /* Error handling               */
 #include "H5PTprivate.h"
 #include "H5TBprivate.h"
+#include <stdlib.h>
 
 /*  Packet Table private data */
 
@@ -69,11 +70,8 @@ static herr_t H5PT_get_index(htbl_t *table_id, hsize_t *pt_index);
  *-------------------------------------------------------------------------
  */
 
-hid_t H5PTcreate_fl ( hid_t loc_id,
-                              const char *dset_name,
-                              hid_t dtype_id,
-                              hsize_t chunk_size,
-                              int compression )
+hid_t
+H5PTcreate_fl(hid_t loc_id, const char *dset_name, hid_t dtype_id, hsize_t chunk_size, int compression)
 {
   htbl_t * table = NULL;
   hid_t dset_id = H5I_BADID;
@@ -84,6 +82,9 @@ hid_t H5PTcreate_fl ( hid_t loc_id,
   hsize_t maxdims[1];
   hid_t ret_value;
 
+  FUNC_ENTER_API(FAIL)
+  H5TRACE5("i", "i*sihIs", loc_id, dset_name, dtype_id, chunk_size, compression);
+
   /* check the arguments */
   if (dset_name == NULL) {
     goto out;
@@ -92,7 +93,7 @@ hid_t H5PTcreate_fl ( hid_t loc_id,
   /* Register the packet table ID type if this is the first table created */
   if(H5PT_ptable_id_type < 0)
     if((H5PT_ptable_id_type = H5Iregister_type((size_t)H5PT_HASH_TABLE_SIZE, 0, (H5I_free_t)H5PT_free_id)) < 0)
-      goto out;
+      goto error;
 
   /* Get memory for the table identifier */
   table = (htbl_t *)HDmalloc(sizeof(htbl_t));
@@ -102,33 +103,33 @@ hid_t H5PTcreate_fl ( hid_t loc_id,
   dims_chunk[0] = chunk_size;
   maxdims[0] = H5S_UNLIMITED;
   if((space_id = H5Screate_simple(1, dims, maxdims)) < 0)
-    goto out;
+    goto error;
 
   /* Modify dataset creation properties to enable chunking  */
   plist_id = H5Pcreate(H5P_DATASET_CREATE);
   if(H5Pset_chunk(plist_id, 1, dims_chunk) < 0)
-    goto out;
+    goto error;
   if(compression >= 0 && compression <= 9)
     if(H5Pset_deflate(plist_id, (unsigned)compression) < 0)
-        goto out;
+        goto error;
 
   /* Create the dataset. */
   if((dset_id = H5Dcreate2(loc_id, dset_name, dtype_id, space_id, H5P_DEFAULT, plist_id, H5P_DEFAULT)) < 0)
-    goto out;
+    goto error;
 
   /* Terminate access to the data space. */
   if(H5Sclose(space_id) < 0)
-    goto out;
+    goto error;
 
   /* End access to the property list */
   if(H5Pclose(plist_id) < 0)
-    goto out;
+    goto error;
 
   /* Create the table identifier */
   table->dset_id = dset_id;
 
   if((table->type_id = H5Tcopy(dtype_id)) < 0)
-    goto out;
+    goto error;
 
   if((table->type_id = H5Tget_native_type(table->type_id, H5T_DIR_DEFAULT)) < 0)
     goto out;
@@ -144,9 +145,9 @@ hid_t H5PTcreate_fl ( hid_t loc_id,
   else
     H5PT_close(table);
 
-  return ret_value;
+  goto done;
 
-  out:
+  error:
     H5E_BEGIN_TRY
     H5Sclose(space_id);
     H5Pclose(plist_id);
@@ -154,7 +155,10 @@ hid_t H5PTcreate_fl ( hid_t loc_id,
     if(table)
       HDfree(table);
     H5E_END_TRY
-    return H5I_INVALID_HID;
+    ret_value = H5I_INVALID_HID;
+
+  done:
+    FUNC_LEAVE_API(ret_value)
 }
 
 #ifdef H5_VLPT_ENABLED
@@ -179,12 +183,14 @@ hid_t H5PTcreate_fl ( hid_t loc_id,
  *
  *-------------------------------------------------------------------------
  */
-hid_t H5PTcreate_vl ( hid_t loc_id,
-                                 const char*dset_name,
-                                 hsize_t chunk_size)
+hid_t
+H5PTcreate_vl(hid_t loc_id, const char *dset_name, hsize_t chunk_size)
 {
   hid_t ret_value=H5I_BADID;
   hid_t vltype;
+
+  FUNC_ENTER_API(FAIL)
+  H5TRACE3("i", "i*sh", loc_id, dset_name, chunk_size);
 
   /* check the arguments */
   if (dset_name == NULL) {
@@ -194,21 +200,24 @@ hid_t H5PTcreate_vl ( hid_t loc_id,
   /* Create a variable length type that uses single bytes as its base type */
   vltype = H5Tvlen_create(H5T_NATIVE_UCHAR);
   if(vltype < 0)
-    goto out;
+    goto error;
 
   if((ret_value=H5PTcreate_fl(loc_id, dset_name, vltype, chunk_size, 0)) < 0)
-    goto out;
+    goto error;
 
   /* close the vltype */
   if(H5Tclose(vltype) < 0)
-    goto out;
+    goto error;
 
-  return ret_value;
+  goto done;
 
-out:
+error:
   if(ret_value != H5I_BADID)
     H5PTclose(ret_value);
-  return H5I_BADID;
+  ret_value = H5I_BADID;
+
+done:
+    FUNC_LEAVE_API(ret_value)
 }
 #endif /* H%_VLPT_ENABLED */
 
@@ -236,14 +245,16 @@ out:
  *
  *-------------------------------------------------------------------------
  */
-hid_t H5PTopen( hid_t loc_id,
-                             const char *dset_name )
+hid_t
+H5PTopen(hid_t loc_id, const char *dset_name)
 {
   hid_t type_id=H5I_BADID;
   hid_t space_id=H5I_BADID;
   htbl_t * table = NULL;
   hid_t ret_value;
   hsize_t dims[1];
+  FUNC_ENTER_API(FAIL)
+  H5TRACE2("i", "i*s", loc_id, dset_name);
 
   /* check the arguments */
   if (dset_name == NULL) {
@@ -253,44 +264,44 @@ hid_t H5PTopen( hid_t loc_id,
   /* Register the packet table ID type if this is the first table created */
   if( H5PT_ptable_id_type < 0)
     if((H5PT_ptable_id_type = H5Iregister_type((size_t)H5PT_HASH_TABLE_SIZE, 0, (H5I_free_t)H5PT_free_id)) < 0)
-      goto out;
+      goto error;
 
   table = (htbl_t *)HDmalloc(sizeof(htbl_t));
 
   if ( table == NULL ) {
-    goto out;
+    goto error;
   }
   table->dset_id = H5I_BADID;
   table->type_id = H5I_BADID;
 
   /* Open the dataset */
   if((table->dset_id = H5Dopen2(loc_id, dset_name, H5P_DEFAULT)) < 0)
-      goto out;
+      goto error;
   if(table->dset_id < 0)
-    goto out;
+    goto error;
 
   /* Get the dataset's disk datatype */
   if((type_id = H5Dget_type(table->dset_id)) < 0)
-    goto out;
+    goto error;
 
   /* Get the table's native datatype */
   if((table->type_id = H5Tget_native_type(type_id, H5T_DIR_ASCEND)) < 0)
-    goto out;
+    goto error;
 
   if(H5Tclose(type_id) < 0)
-    goto out;
+    goto error;
 
   /* Initialize the current record pointer */
   if((H5PT_create_index(table)) < 0)
-    goto out;
+    goto error;
 
   /* Get number of records in table */
   if((space_id=H5Dget_space(table->dset_id)) < 0)
-    goto out;
+    goto error;
   if( H5Sget_simple_extent_dims( space_id, dims, NULL) < 0)
-    goto out;
+    goto error;
   if(H5Sclose(space_id) < 0)
-    goto out;
+    goto error;
   table->size = dims[0];
 
   /* Get an ID for this table */
@@ -301,9 +312,9 @@ hid_t H5PTopen( hid_t loc_id,
   else
     H5PT_close(table);
 
-  return ret_value;
+  goto done;
 
-out:
+error:
   H5E_BEGIN_TRY
   H5Tclose(type_id);
   H5Sclose(space_id);
@@ -314,7 +325,10 @@ out:
     HDfree(table);
   }
   H5E_END_TRY
-  return H5I_INVALID_HID;
+  ret_value = H5I_INVALID_HID;
+
+done:
+    FUNC_LEAVE_API(ret_value)
 }
 
 /*-------------------------------------------------------------------------
