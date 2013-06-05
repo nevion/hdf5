@@ -96,6 +96,16 @@ public:
         return GetPacketCount(ignoreError);
     }
 
+    /* GetDataSet
+     * Returns the id of the dataset backing this packet table or HID_INVALID on error
+     */
+    hid_t GetDataSet();
+
+    /* GetDataType
+     * Returns the id of the datatype backing this packet table or HID_INVALID on error
+     */
+    hid_t GetDataType();
+
 protected:
     hid_t table_id;
 };

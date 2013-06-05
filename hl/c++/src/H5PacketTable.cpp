@@ -117,6 +117,16 @@
         return npackets;
     }
 
+    hid_t PacketTable::GetDataSet()
+    {
+        return H5PTget_dataset(table_id);
+    }
+
+    hid_t PacketTable::GetDataType()
+    {
+        return H5PTget_type(table_id);
+    }
+
     /********************************/
     /* Fixed-Length Packet Table    */
     /********************************/
