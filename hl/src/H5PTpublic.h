@@ -45,6 +45,17 @@ H5_HLDLL hid_t H5PTopen( hid_t loc_id,
 
 H5_HLDLL herr_t  H5PTclose( hid_t table_id );
 
+/*-------------------------------------------------------------------------
+ *
+ * Accessor functions
+ *
+ *-------------------------------------------------------------------------
+ */
+
+H5_HLDLL hid_t  H5PTget_dataset(hid_t table_id);
+H5_HLDLL hid_t  H5PTget_type(hid_t table_id);
+
+
 
 /*-------------------------------------------------------------------------
  *

@@ -401,7 +401,7 @@ out:
  * Purpose: Closes a table (i.e. cleans up all open resources used by a
  *          table).
  *
- * Return: Success: 0, Failure: -1
+ * Return: Success: 0, Failure: FAIL
  *
  * Programmer: Nat Furrer, nfurrer@ncsa.uiuc.edu
  *             James Laird, jlaird@ncsa.uiuc.edu
@@ -414,17 +414,19 @@ out:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5PTclose( hid_t table_id )
+herr_t H5PTclose(hid_t table_id )
 {
   htbl_t * table;
+  int ret_value = 0;
+  FUNC_ENTER_API(FAIL)
 
   /* Remove the ID from the library */
   if((table = (htbl_t *)H5Iremove_verify(table_id, H5PT_ptable_id_type)) ==NULL)
-    goto out;
+    goto error;
 
   /* If the library found the table, remove it */
   if( H5PT_close(table) < 0)
-    goto out;
+    goto error;
 
   /* One less packet table open */
   H5PT_ptable_count--;
@@ -437,12 +439,88 @@ herr_t H5PTclose( hid_t table_id )
     H5PT_ptable_id_type = H5I_UNINIT;
   }
 
-  return 0;
+  goto done;
+error:
+  ret_value = FAIL;
 
-out:
-  return -1;
+done:
+    FUNC_LEAVE_API(ret_value)
 }
 
+/*-------------------------------------------------------------------------
+ *
+ * Accessor functions
+ *
+ *-------------------------------------------------------------------------
+ */
+
+/*-------------------------------------------------------------------------
+ * Function: H5PTget_dataset
+ *
+ * Purpose: Returns the backend dataset of this packet table
+ *
+ * Return: Success: the hid of the dataset, Failure: H5I_INVALID_HID
+ *
+ * Programmer: Jason Newton, nevion@gmail.com
+ *
+ * Date: June 4, 2013
+ *
+ * Comments:
+ *
+ * Modifications:
+ *
+ *
+ *-------------------------------------------------------------------------
+ */
+hid_t H5PTget_dataset( hid_t table_id)
+{
+  htbl_t * table;
+  hid_t ret_value = H5I_INVALID_HID;
+
+  /* find the table struct from its ID */
+  if((table = (htbl_t *) H5Iobject_verify(table_id, H5PT_ptable_id_type)) == NULL)
+    goto error;
+
+  ret_value = table->dset_id;
+
+error:
+
+  return ret_value;
+}
+
+/*-------------------------------------------------------------------------
+ * Function: H5PTget_type
+ *
+ * Purpose: Returns the backend type of this packet table
+ *
+ * Return: Success: the hid of the type, Failure: H5I_INVALID_HID
+ *
+ * Programmer: Jason Newton, nevion@gmail.com
+ *
+ * Date: June 4, 2013
+ *
+ * Comments:
+ *
+ * Modifications:
+ *
+ *
+ *-------------------------------------------------------------------------
+ */
+hid_t H5PTget_type( hid_t table_id)
+{
+  htbl_t * table;
+  hid_t ret_value = H5I_INVALID_HID;
+
+  /* find the table struct from its ID */
+  if((table = (htbl_t *) H5Iobject_verify(table_id, H5PT_ptable_id_type)) == NULL)
+    goto error;
+
+  ret_value = table->type_id;
+
+error:
+
+  return ret_value;
+}
 
 /*-------------------------------------------------------------------------
  *
