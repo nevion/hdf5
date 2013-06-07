@@ -134,7 +134,7 @@ void H5File::p_get_file(const char* name, unsigned int flags, const FileCreatPro
     {
         hid_t create_plist_id = create_plist.getId();
         hid_t access_plist_id = access_plist.getId();
-        id = H5Fcreate( name, flags, create_plist_id, access_plist_id );
+        id = H5Fcreate( name, flags & ~H5F_ACC_CREAT, create_plist_id, access_plist_id );
         if( id < 0 )  // throw an exception when open/create fail
         {
             throw FileIException("H5File constructor", "H5Fcreate failed");
