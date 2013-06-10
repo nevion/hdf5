@@ -105,6 +105,9 @@ class H5_DLLCPP DSetCreatPropList : public PropList {
 	// Sets Fletcher32 checksum of EDC for this property list.
 	void setFletcher32() const;
 
+	// Sets method of the N-bit filter.
+	void setNbit() const;
+
 	// Sets method of the shuffle filter.
 	void setShuffle() const;
 

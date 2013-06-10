@@ -455,6 +455,27 @@ bool DSetCreatPropList::allFiltersAvail()
 }
 
 //--------------------------------------------------------------------------
+// Function:	DSetCreatPropList::setNbit
+///\brief	Sets method of the NBit filter
+///
+///\exception	H5::PropListIException
+///\par Description
+///		Please refer to the Reference Manual of \c H5Pset_nbit for
+///		details.
+/// http://www.hdfgroup.org/HDF5/doc/RM/RM_H5P.html#Property-setNbit
+// Programmer	Binh-Minh Ribler - 2000
+//--------------------------------------------------------------------------
+void DSetCreatPropList::setNbit() const
+{
+   herr_t ret_value = H5Pset_nbit(id);
+   if( ret_value < 0 )
+   {
+      throw PropListIException("DSetCreatPropList::setNbit",
+                "H5Pset_NBit failed");
+   }
+}
+
+//--------------------------------------------------------------------------
 // Function:	DSetCreatPropList::setShuffle
 ///\brief	Sets method of the shuffle filter
 ///
