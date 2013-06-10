@@ -36,7 +36,16 @@
      */
     PacketTable::PacketTable(hid_t fileID, const char* name)
     {
-        table_id = H5PTopen( fileID, name);
+        table_id = H5PTopen2(fileID, name, H5I_BADID);
+    }
+
+    /* "Open" Constructor
+     * Opens an existing packet table, which can contain either fixed-length or
+     * variable-length packets.
+     */
+    PacketTable::PacketTable(hid_t fileID, const char* name, hid_t mem_type)
+    {
+        table_id = H5PTopen2(fileID, name, mem_type);
     }
 
     /* Destructor
@@ -44,7 +53,7 @@
      */
     PacketTable::~PacketTable()
     {
-        H5PTclose( table_id);
+        H5PTclose(table_id);
     }
 
     /* IsValid
@@ -113,7 +122,7 @@
     {
         hsize_t npackets;
 
-        error = H5PTget_num_packets( table_id, (hsize_t *)&npackets);
+        error = H5PTget_num_packets(table_id, (hsize_t *)&npackets);
         return npackets;
     }
 
@@ -139,7 +148,19 @@
      */
     FL_PacketTable::FL_PacketTable(hid_t fileID, const char* name, hid_t dtypeID, hsize_t chunkSize, int compression)
     {
-        table_id = H5PTcreate_fl ( fileID, name, dtypeID, chunkSize, compression);
+        table_id = H5PTcreate_fl (fileID, name, dtypeID, chunkSize, compression);
+    }
+
+    /* Constructor
+     * Creates a packet table in which to store fixed length packets.
+     * Takes the ID of the file the packet table will be created in, the name of
+     * the packet table, the ID of the datatype of the set, and the size
+     * of a memory chunk used in chunking.
+     */
+    FL_PacketTable::FL_PacketTable(hid_t fileID, const char* name, hid_t dtypeID, hsize_t chunkSize, hid_t plist_id, int dummy)
+    {
+        (void) dummy;
+        table_id = H5PTcreate_fl2 (fileID, name, dtypeID, chunkSize, plist_id);
     }
 
     /* "Open" Constructor
@@ -149,7 +170,7 @@
     FL_PacketTable::FL_PacketTable(hid_t fileID, const char* name) : PacketTable(fileID, name)
     {
 #ifdef VLPT_REMOVED
-        if( H5PTis_varlen(table_id) != 0 )    // If this is not a fixed-length table
+        if(H5PTis_varlen(table_id) != 0 )    // If this is not a fixed-length table
         {
             H5PTclose(table_id);
             table_id = -1;
@@ -238,7 +259,7 @@
      */
     VL_PacketTable::VL_PacketTable(hid_t fileID, const char* name, hsize_t chunkSize)
     {
-        table_id = H5PTcreate_vl ( fileID, name, chunkSize);
+        table_id = H5PTcreate_vl (fileID, name, chunkSize);
     }
 
     /* "Open" Constructor
@@ -247,7 +268,7 @@
      */
     VL_PacketTable::VL_PacketTable(hid_t fileID, const char* name) : PacketTable(fileID, name)
     {
-        if( H5PTis_varlen(table_id) != 1 )    // If this is not a variable-length table
+        if(H5PTis_varlen(table_id) != 1 )    // If this is not a variable-length table
         {
             H5PTclose(table_id);
             table_id = -1;
@@ -338,6 +359,6 @@
      */
     int VL_PacketTable::FreeReadbuff(size_t numStructs, hvl_t * buffer)
     {
-        return H5PTfree_vlen_readbuff( table_id, numStructs, buffer);
+        return H5PTfree_vlen_readbuff(table_id, numStructs, buffer);
     }
 #endif /* VLPT_REMOVED */
