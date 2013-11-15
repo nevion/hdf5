@@ -69,21 +69,56 @@ static herr_t H5PT_get_index(htbl_t *table_id, hsize_t *pt_index);
  *
  *-------------------------------------------------------------------------
  */
-
 hid_t
 H5PTcreate_fl(hid_t loc_id, const char *dset_name, hid_t dtype_id, hsize_t chunk_size, int compression)
+{
+  hid_t ret_value = H5I_INVALID_HID;
+  hid_t plist_id = H5I_BADID;
+  FUNC_ENTER_API(FAIL)
+  H5TRACE5("i", "i*sihIs", loc_id, dset_name, dtype_id, chunk_size, compression);
+  plist_id = H5Pcreate(H5P_DATASET_CREATE);
+  if(compression >= 0 && compression <= 9)
+    if(H5Pset_deflate(plist_id, (unsigned)compression) < 0)
+        goto done;
+  ret_value = H5PTcreate_fl2(loc_id, dset_name, dtype_id, chunk_size, plist_id);
+
+  done:
+    H5Pclose(plist_id);
+    FUNC_LEAVE_API(ret_value)
+}
+
+/*-------------------------------------------------------------------------
+ * Function: H5PTcreate_fl2
+ *
+ * Purpose: Creates a dataset containing a table and returns the Identifier
+ *          of the table.
+ *
+ * Return: Success: table ID, Failure: Negative
+ *
+ * Programmer: Nat Furrer, nfurrer@ncsa.uiuc.edu
+ *             James Laird, jlaird@ncsa.uiuc.edu
+ *             Jason Newton, nevion@gmail.com
+ *
+ * Date: June 6, 2013
+ *
+ *
+ * Modifications:
+ *
+ *-------------------------------------------------------------------------
+ */
+hid_t
+H5PTcreate_fl2(hid_t loc_id, const char *dset_name, hid_t dtype_id, hsize_t chunk_size, hid_t plist_id)
 {
   htbl_t * table = NULL;
   hid_t dset_id = H5I_BADID;
   hid_t space_id = H5I_BADID;
-  hid_t plist_id = H5I_BADID;
   hsize_t dims[1];
   hsize_t dims_chunk[1];
   hsize_t maxdims[1];
   hid_t ret_value;
 
   FUNC_ENTER_API(FAIL)
-  H5TRACE5("i", "i*sihIs", loc_id, dset_name, dtype_id, chunk_size, compression);
+  H5TRACE5("i", "i*sihi", loc_id, dset_name, dtype_id, chunk_size, plist_id);
 
   /* check the arguments */
   if (dset_name == NULL) {
@@ -105,13 +140,14 @@ H5PTcreate_fl(hid_t loc_id, const char *dset_name, hid_t dtype_id, hsize_t chunk
   if((space_id = H5Screate_simple(1, dims, maxdims)) < 0)
     goto error;
 
+  if(plist_id == H5P_DEFAULT){
+      plist_id = H5Pcreate(H5P_DATASET_CREATE);
+  }else{
+      plist_id = H5Pcopy(plist_id);
+  }
   /* Modify dataset creation properties to enable chunking  */
-  plist_id = H5Pcreate(H5P_DATASET_CREATE);
   if(H5Pset_chunk(plist_id, 1, dims_chunk) < 0)
     goto error;
-  if(compression >= 0 && compression <= 9)
-    if(H5Pset_deflate(plist_id, (unsigned)compression) < 0)
-        goto error;
 
   /* Create the dataset. */
   if((dset_id = H5Dcreate2(loc_id, dset_name, dtype_id, space_id, H5P_DEFAULT, plist_id, H5P_DEFAULT)) < 0)
@@ -248,13 +284,46 @@ done:
 hid_t
 H5PTopen(hid_t loc_id, const char *dset_name)
 {
-  hid_t type_id=H5I_BADID;
-  hid_t space_id=H5I_BADID;
+    return H5PTopen2(loc_id, dset_name, H5I_BADID);
+}
+
+/*-------------------------------------------------------------------------
+ * Function: H5PTopen2
+ *
+ * Purpose: Opens a dataset containing a table and returns the Identifier
+ *          of the table.
+ *
+ * Return: Success: table ID, Failure: H5I_INVALID_HID
+ *
+ * Programmer: Nat Furrer, nfurrer@ncsa.uiuc.edu
+ *             James Laird, jlaird@ncsa.uiuc.edu
+ *             Jason Newton, nevion@gmail.com
+ *
+ * Date: March 10, 2004
+ *
+ * Comments:
+ *
+ * Modifications:
+ *
+ * 		John Mainzer -- 4/23/08
+ * 		Added error check on malloc of table, initialized fields
+ * 		in table to keep lower level code from choking on bogus
+ * 		data in error cases.
+ * 		Jason Newton -- 6/5/2013
+ * 		fork from H5PTopen
+ *
+ *-------------------------------------------------------------------------
+ */
+hid_t
+H5PTopen2(hid_t loc_id, const char *dset_name, hid_t mem_type)
+{
+  hid_t type_id = H5I_BADID;
+  hid_t space_id = H5I_BADID;
   htbl_t * table = NULL;
   hid_t ret_value;
   hsize_t dims[1];
   FUNC_ENTER_API(FAIL)
-  H5TRACE2("i", "i*s", loc_id, dset_name);
+  H5TRACE3("i", "i*si", loc_id, dset_name, mem_type);
 
   /* check the arguments */
   if (dset_name == NULL) {
@@ -268,7 +337,7 @@ H5PTopen(hid_t loc_id, const char *dset_name)
 
   table = (htbl_t *)HDmalloc(sizeof(htbl_t));
 
-  if ( table == NULL ) {
+  if (table == NULL ) {
     goto error;
   }
   table->dset_id = H5I_BADID;
@@ -280,16 +349,20 @@ H5PTopen(hid_t loc_id, const char *dset_name)
   if(table->dset_id < 0)
     goto error;
 
-  /* Get the dataset's disk datatype */
-  if((type_id = H5Dget_type(table->dset_id)) < 0)
-    goto error;
+  if(mem_type == H5I_BADID){
+      /* Get the dataset's disk datatype */
+      if((type_id = H5Dget_type(table->dset_id)) < 0)
+        goto error;
 
-  /* Get the table's native datatype */
-  if((table->type_id = H5Tget_native_type(type_id, H5T_DIR_ASCEND)) < 0)
-    goto error;
+      /* Get the table's native datatype */
+      if((table->type_id = H5Tget_native_type(type_id, H5T_DIR_ASCEND)) < 0)
+        goto error;
 
-  if(H5Tclose(type_id) < 0)
-    goto error;
+      if(H5Tclose(type_id) < 0)
+        goto error;
+  }else{
+      table->type_id = H5Tcopy(mem_type);
+  }
 
   /* Initialize the current record pointer */
   if((H5PT_create_index(table)) < 0)
@@ -298,7 +371,7 @@ H5PTopen(hid_t loc_id, const char *dset_name)
   /* Get number of records in table */
   if((space_id=H5Dget_space(table->dset_id)) < 0)
     goto error;
-  if( H5Sget_simple_extent_dims( space_id, dims, NULL) < 0)
+  if(H5Sget_simple_extent_dims(space_id, dims, NULL) < 0)
     goto error;
   if(H5Sclose(space_id) < 0)
     goto error;
@@ -366,7 +439,7 @@ H5PT_free_id(void *id)
  *-------------------------------------------------------------------------
  */
 static herr_t
-H5PT_close( htbl_t* table)
+H5PT_close(htbl_t* table)
 {
   if(table == NULL)
     goto out;
@@ -414,7 +487,7 @@ out:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5PTclose(hid_t table_id )
+herr_t H5PTclose(hid_t table_id)
 {
   htbl_t * table;
   int ret_value = 0;
@@ -425,7 +498,7 @@ herr_t H5PTclose(hid_t table_id )
     goto error;
 
   /* If the library found the table, remove it */
-  if( H5PT_close(table) < 0)
+  if(H5PT_close(table) < 0)
     goto error;
 
   /* One less packet table open */
@@ -472,7 +545,7 @@ done:
  *
  *-------------------------------------------------------------------------
  */
-hid_t H5PTget_dataset( hid_t table_id)
+hid_t H5PTget_dataset(hid_t table_id)
 {
   htbl_t * table;
   hid_t ret_value = H5I_INVALID_HID;
@@ -506,7 +579,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-hid_t H5PTget_type( hid_t table_id)
+hid_t H5PTget_type(hid_t table_id)
 {
   htbl_t * table;
   hid_t ret_value = H5I_INVALID_HID;
@@ -547,7 +620,7 @@ error:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5PTappend( hid_t table_id,
+herr_t H5PTappend(hid_t table_id,
                            size_t nrecords,
                            const void * data )
 {
@@ -562,7 +635,7 @@ herr_t H5PTappend( hid_t table_id,
     return 0;
 
   if((H5TB_common_append_records(table->dset_id, table->type_id,
-  			nrecords, table->size, data)) < 0)
+                  nrecords, table->size, data)) < 0)
     goto out;
 
   /* Update table size */
@@ -601,7 +674,7 @@ out:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5PTget_next( hid_t table_id,
+herr_t H5PTget_next(hid_t table_id,
                              size_t nrecords,
                              void * data)
 {
@@ -646,7 +719,7 @@ out:
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5PTread_packets( hid_t table_id,
+herr_t H5PTread_packets(hid_t table_id,
                          hsize_t start,
                          size_t nrecords,
                          void *data)
@@ -662,7 +735,7 @@ herr_t H5PTread_packets( hid_t table_id,
   if(nrecords == 0)
     return 0;
 
-  if( H5TB_common_read_records(table->dset_id, table->type_id,
+  if(H5TB_common_read_records(table->dset_id, table->type_id,
                               start, nrecords, table->size, data) < 0)
     goto out;
 
@@ -700,7 +773,7 @@ out:
 static herr_t
 H5PT_create_index(htbl_t *table)
 {
-  if( table != NULL)
+  if(table != NULL)
   {
     table->current_index = 0;
     return 0;
@@ -712,9 +785,9 @@ static herr_t
 H5PT_set_index(htbl_t *table, hsize_t index)
 {
   /* Ensure index is valid */
-  if( table != NULL )
+  if(table != NULL )
   {
-    if( index < table->size )
+    if(index < table->size )
     {
       table->current_index = index;
       return 0;
@@ -727,7 +800,7 @@ static herr_t
 H5PT_get_index(htbl_t *table, hsize_t *index)
 {
   /* Ensure index is valid */
-  if( table != NULL )
+  if(table != NULL )
   {
     if(index)
       *index = table->current_index;
@@ -813,7 +886,7 @@ herr_t H5PTget_index(hid_t table_id, hsize_t *pt_index)
  *
  *-------------------------------------------------------------------------
  */
-herr_t H5PTget_num_packets( hid_t table_id, hsize_t *nrecords)
+herr_t H5PTget_num_packets(hid_t table_id, hsize_t *nrecords)
 {
   htbl_t * table;
 
@@ -888,10 +961,10 @@ herr_t H5PTis_varlen(hid_t table_id)
   if((table = (htbl_t *) H5Iobject_verify(table_id, H5PT_ptable_id_type)) == NULL)
     goto out;
 
-  if((type = H5Tget_class( table->type_id )) == H5T_NO_CLASS)
+  if((type = H5Tget_class(table->type_id )) == H5T_NO_CLASS)
     goto out;
 
-  if( type == H5T_VLEN )
+  if(type == H5T_VLEN )
     return 1;
   else
     return 0;
@@ -928,7 +1001,7 @@ out:
  *-------------------------------------------------------------------------
  */
 
-herr_t H5PTfree_vlen_readbuff( hid_t table_id,
+herr_t H5PTfree_vlen_readbuff(hid_t table_id,
                                size_t _bufflen,
                                void * buff )
 {

@@ -34,6 +34,10 @@ H5_HLDLL hid_t H5PTcreate_fl ( hid_t loc_id,
                       hsize_t chunk_size,
                       int compression );
 
+H5_HLDLL hid_t
+H5PTcreate_fl2(hid_t loc_id, const char *dset_name, hid_t dtype_id,
+        hsize_t chunk_size, hid_t plist_id);
+
 #ifdef VLPT_REMOVED
 H5_HLDLL hid_t H5PTcreate_vl ( hid_t loc_id,
                       const char *dset_name,
@@ -42,8 +46,9 @@ H5_HLDLL hid_t H5PTcreate_vl ( hid_t loc_id,
 
 H5_HLDLL hid_t H5PTopen( hid_t loc_id,
                 const char *dset_name );
+H5_HLDLL hid_t H5PTopen2(hid_t loc_id, const char *dset_name, hid_t mem_type);
 
-H5_HLDLL herr_t  H5PTclose( hid_t table_id );
+H5_HLDLL herr_t H5PTclose( hid_t table_id );
 
 /*-------------------------------------------------------------------------
  *
