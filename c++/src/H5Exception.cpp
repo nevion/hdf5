@@ -330,6 +330,14 @@ void Exception::printError(FILE* stream) const
     Exception::printErrorStack(stream, H5E_DEFAULT);
 }
 
+// Function:	Exception::what
+///\brief	stdlib compliant basic error message of exception
+// Programmer	Jason Newton - 2013
+//--------------------------------------------------------------------------
+const char* Exception::what() const throw(){
+    return getCDetailMsg();
+}
+
 //--------------------------------------------------------------------------
 // Function:	Exception destructor
 ///\brief	Noop destructor

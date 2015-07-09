@@ -18,6 +18,7 @@
 #define __H5Exception_H
 
 #include <string>
+#include <exception>
 
 #ifndef H5_NO_NAMESPACE
 namespace H5 {
@@ -33,7 +34,7 @@ namespace H5 {
 
     Many classes are derived from Exception for specific HDF5 C interfaces.
 */
-class H5_DLLCPP Exception {
+class H5_DLLCPP Exception : public std::exception {
    public:
 	// Creates an exception with a function name where the failure occurs
 	// and an optional detailed message
@@ -75,6 +76,7 @@ class H5_DLLCPP Exception {
 	static void printErrorStack(FILE* stream = stderr,
 				    hid_t err_stack = H5E_DEFAULT); // Static
 	virtual void printError(FILE* stream = NULL) const;
+    virtual const char* what() const throw();
 
 	// Default constructor
 	Exception();
