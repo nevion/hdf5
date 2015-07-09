@@ -271,6 +271,25 @@ void H5File::openFile(const H5std_string& name, unsigned int flags, const FileAc
     openFile(name.c_str(), flags, access_plist);
 }
 
+
+//--------------------------------------------------------------------------
+// Function:	H5File::openFile
+///\brief	wraps an existing file id
+///\param	id - IN: file identifier to construct from
+// Programmer	Jason Newton 2014
+//--------------------------------------------------------------------------
+void H5File::openFile(int id)
+{
+    try {
+        close();
+    }
+    catch (Exception close_error) {
+        throw FileIException("H5File::openFile", close_error.getDetailMsg());
+    }
+    this->id = id;
+    incRefCount(); // increment number of references to this id
+}
+
 //--------------------------------------------------------------------------
 // Function:	H5File::reOpen
 ///\brief	Reopens this file.

@@ -36,11 +36,15 @@ class H5_DLLCPP H5File : public H5Location, public CommonFG {
 	   const FileCreatPropList& create_plist = FileCreatPropList::DEFAULT,
 	   const FileAccPropList& access_plist = FileAccPropList::DEFAULT );
 
+	// Creates an H5File using an existing file id.
+	H5File(hid_t existing_id);
+
 	// Open the file
 	void openFile(const H5std_string& name, unsigned int flags,
 	    const FileAccPropList& access_plist = FileAccPropList::DEFAULT);
 	void openFile(const char* name, unsigned int flags,
 	    const FileAccPropList& access_plist = FileAccPropList::DEFAULT);
+	void openFile(int existing_id);
 
 	// Close this file.
 	virtual void close();
@@ -82,10 +86,6 @@ class H5_DLLCPP H5File : public H5Location, public CommonFG {
 
 	// Gets the file id
 	virtual hid_t getLocId() const;
-
-	// Creates an H5File using an existing file id.  Not recommended
-	// in applications.
-	H5File(hid_t existing_id);
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
